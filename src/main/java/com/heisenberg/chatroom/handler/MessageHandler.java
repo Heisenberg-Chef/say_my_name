@@ -1,6 +1,6 @@
 package com.heisenberg.chatroom.handler;
 
-import com.alibaba.fastjson2.JSONObject;
+import com.alibaba.fastjson.JSONObject;
 import com.heisenberg.chatroom.pojo.UserInfo;
 import com.heisenberg.chatroom.proto.ChatCode;
 import io.netty.channel.ChannelHandlerContext;
@@ -16,11 +16,12 @@ public class MessageHandler extends SimpleChannelInboundHandler<TextWebSocketFra
     private static final Logger logger = LoggerFactory.getLogger(MessageHandler.class);
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, TextWebSocketFrame frame) throws Exception {
+    protected void channelRead0(ChannelHandlerContext ctx, TextWebSocketFrame frame)
+            throws Exception {
         UserInfo userInfo = UserInfoManager.getUserInfo(ctx.channel());
         if (userInfo != null && userInfo.isAuth()) {
-            JSONObject json = JSONObject.parseObject(frame.text());
-            // 广播返回 用户发送的消息文本
+            com.alibaba.fastjson.JSONObject json = JSONObject.parseObject(frame.text());
+            // 广播返回用户发送的消息文本
             UserInfoManager.broadcastMess(userInfo.getUserId(), userInfo.getNick(), json.getString("mess"));
         }
     }

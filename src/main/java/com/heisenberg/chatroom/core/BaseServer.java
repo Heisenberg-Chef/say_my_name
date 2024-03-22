@@ -14,9 +14,9 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 
 public abstract class BaseServer implements Server {
 
-    private Logger log = LoggerFactory.getLogger(BaseServer.class);
+    protected Logger logger = LoggerFactory.getLogger(getClass());
 
-    protected String host = "0.0.0.0";
+    protected String host = "127.0.0.1";
 
     protected int port = 6969;
 

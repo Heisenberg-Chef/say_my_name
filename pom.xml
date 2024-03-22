@@ -60,14 +60,55 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
-                <version>2.2</version>
+                <version>3.3.0</version>
                 <configuration>
+                    <!-- 配置 JAR 文件的 MANIFEST.MF 文件 -->
+                    <archive>
+                        <manifest>
+                            <!-- 指定程序的入口点main方法的类 -->
+                            <mainClass>com.heisenberg.chatroom.TIGHT_TIGHT_TIGHT</mainClass>
+                        </manifest>
+                    </archive>
                     <descriptorRefs>
+                        <!-- 预定义描述符，打包成一个完成的JAR -->
                         <descriptorRef>
                             jar-with-dependencies
                         </descriptorRef>
                     </descriptorRefs>
                 </configuration>
+                <executions>
+                    <execution>
+                        <id>assembly-package</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.3.0</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <!-- 在MANIFEST.MF文件中添加Class-Path类路径信息，运行时环境依赖类 -->
+                            <addClasspath>true</addClasspath>
+                            <classpathPrefix>lib/</classpathPrefix>
+                            <mainClass>com.heisenberg.chatroom.TIGHT_TIGHT_TIGHT</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>default-jar</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

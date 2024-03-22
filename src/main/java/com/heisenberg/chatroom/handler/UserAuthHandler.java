@@ -1,6 +1,6 @@
 package com.heisenberg.chatroom.handler;
 
-import com.alibaba.fastjson2.JSONObject;
+import com.alibaba.fastjson.JSONObject;
 import com.heisenberg.chatroom.pojo.UserInfo;
 import com.heisenberg.chatroom.proto.ChatCode;
 import com.heisenberg.chatroom.util.Constants;
@@ -36,7 +36,11 @@ public class UserAuthHandler extends SimpleChannelInboundHandler<Object> {
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
-
+        if (msg instanceof FullHttpRequest) {
+            handleHttpRequest(ctx, (FullHttpRequest) msg);
+        } else if (msg instanceof WebSocketFrame) {
+            handleWebSocket(ctx, (WebSocketFrame) msg);
+        }
     }
 
     private void handleHttpRequest(ChannelHandlerContext ctx, FullHttpRequest request) {
@@ -45,18 +49,17 @@ public class UserAuthHandler extends SimpleChannelInboundHandler<Object> {
             ctx.channel().close();
             return;
         }
-        // 如果确定是websocket，那么进行下一次的服务器的握手
-        WebSocketServerHandshakerFactory webSocketServerHandshakerFactory = new WebSocketServerHandshakerFactory(
-                Constants.WEBSOCKET_URL, null, true
-        );
-        handshaker = webSocketServerHandshakerFactory.newHandshaker(request);
+        WebSocketServerHandshakerFactory handshakerFactory = new WebSocketServerHandshakerFactory(
+                Constants.WEBSOCKET_URL, null, true);
+        handshaker = handshakerFactory.newHandshaker(request);
         if (handshaker == null) {
             WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(ctx.channel());
         } else {
+            // 动态加入websocket的编解码处理
             handshaker.handshake(ctx.channel(), request);
             UserInfo userInfo = new UserInfo();
             userInfo.setAddr(NettyUtil.parseChannelRemoteAddr(ctx.channel()));
-            // 保存已经存在的Channel到对象中
+            // 存储已经连接的Channel
             UserInfoManager.addChannel(ctx.channel());
         }
     }
@@ -64,11 +67,11 @@ public class UserAuthHandler extends SimpleChannelInboundHandler<Object> {
     private void handleWebSocket(ChannelHandlerContext ctx, WebSocketFrame frame) {
         // 判断是否关闭链路命令
         if (frame instanceof CloseWebSocketFrame) {
-            handshaker.close(ctx.channel(), (CloseWebSocketFrame) frame.retain()); // netty 引用计数 +1 release为 -1
+            handshaker.close(ctx.channel(), (CloseWebSocketFrame) frame.retain());
             UserInfoManager.removeChannel(ctx.channel());
             return;
         }
-        // 判断是否为ping
+        // 判断是否Ping消息
         if (frame instanceof PingWebSocketFrame) {
             logger.info("ping message:{}", frame.content().retain());
             ctx.writeAndFlush(new PongWebSocketFrame(frame.content().retain()));
@@ -80,35 +83,36 @@ public class UserAuthHandler extends SimpleChannelInboundHandler<Object> {
             ctx.writeAndFlush(new PongWebSocketFrame(frame.content().retain()));
             return;
         }
-        // 只支持文字信息
+
+        // 本程序目前只支持文本消息
         if (!(frame instanceof TextWebSocketFrame)) {
-            throw new UnsupportedOperationException(frame.getClass().getName() + " frame type not supported.");
+            throw new UnsupportedOperationException(frame.getClass().getName() + " frame type not supported");
         }
         String message = ((TextWebSocketFrame) frame).text();
-        JSONObject json = JSONObject.parseObject(message);
+        com.alibaba.fastjson.JSONObject json = JSONObject.parseObject(message);
         int code = json.getInteger("code");
         Channel channel = ctx.channel();
         switch (code) {
             case ChatCode.PING_CODE:
             case ChatCode.PONG_CODE:
                 UserInfoManager.updateUserTime(channel);
-                logger.info("receive pong message, address: {}", NettyUtil.parseChannelRemoteAddr(channel));
+//                UserInfoManager.sendPong(ctx.channel());
+                logger.info("receive pong message, address: {}",NettyUtil.parseChannelRemoteAddr(channel));
                 return;
             case ChatCode.AUTH_CODE:
                 boolean isSuccess = UserInfoManager.saveUser(channel, json.getString("nick"));
-                UserInfoManager.sendInfo(channel, ChatCode.SYS_AUTH_STATE, isSuccess);
+                UserInfoManager.sendInfo(channel,ChatCode.SYS_AUTH_STATE,isSuccess);
                 if (isSuccess) {
-                    // ch.writeAndFlush(new TextWebSocketFrame(ChatProto.buildSysProto(code, mess)));
-                    UserInfoManager.broadCastInfo(ChatCode.SYS_USER_COUNT, UserInfoManager.getAuthUserCount());
+                    UserInfoManager.broadCastInfo(ChatCode.SYS_USER_COUNT,UserInfoManager.getAuthUserCount());
                 }
                 return;
-            case ChatCode.MESS_CODE:// 普通消息留给MessageHandler来处理
+            case ChatCode.MESS_CODE: //普通的消息留给MessageHandler处理
                 break;
             default:
                 logger.warn("The code [{}] can't be auth!!!", code);
                 return;
         }
-        // 向后传递消息给MessageHandler
+        //后续消息交给MessageHandler处理
         ctx.fireChannelRead(frame.retain());
     }
 
